@@ -1,0 +1,73 @@
+---
+title: "What is Board Bibles V1? Overview and requirements"
+description: "Learn what Board Bibles V1 does, how it transforms the TreeRoom bulletin boards with rotating Bible verses, and what you need before installing."
+---
+
+Board Bibles V1 is a BepInEx mod for Gorilla Tag, made by Astra. It takes over both bulletin boards in the TreeRoom — the MOTD board and the Code of Conduct board — and replaces their content with Bible verses. Verses are fetched live from the internet and rotate automatically every five minutes, with a built-in offline fallback if no network connection is available.
+
+## What it does
+
+When Gorilla Tag loads with Board Bibles V1 installed, the mod locates the two bulletin boards in the TreeRoom by their scene path and takes over their text content directly. Both boards are kept in sync and display the same content at all times.
+
+<CardGroup cols={2}>
+  <Card title="Live verse fetching" icon="wifi">
+    The mod calls `bible-api.com` to pull a random verse from one of 8 books of the Bible, including John, Psalms, and Romans.
+  </Card>
+  <Card title="Offline fallback" icon="cloud-slash">
+    If the network is unreachable, the mod selects from 20 hardcoded verses and appends `(offline mode)` to the display.
+  </Card>
+  <Card title="Auto-rotation every 5 minutes" icon="rotate">
+    After the initial verse loads, a new one is fetched and displayed automatically every 5 minutes without any input from you.
+  </Card>
+  <Card title="No base game modifications" icon="shield-check">
+    Board Bibles uses BepInEx and Harmony patching. Your Gorilla Tag installation is never directly modified.
+  </Card>
+</CardGroup>
+
+## How the boards are patched
+
+The mod targets four text components inside `TreeRoom`:
+
+- `motdHeadingText` — the MOTD board heading
+- `motdBodyText` — the MOTD board body
+- `CodeOfConductHeadingText` — the Code of Conduct board heading
+- `COCBodyText_TitleData` — the Code of Conduct board body
+
+The `PlayFabTitleDataTextDisplay` component on the body text objects is disabled so that PlayFab can no longer overwrite the board content. Both boards then receive the same heading and verse text from the mod.
+
+## Startup sequence
+
+<Steps>
+  <Step title="Welcome splash (first 2 minutes)">
+    Immediately after loading into a room, both boards display a welcome message: `WELCOME TO BOARD BIBLE MADE BY ASTRA` followed by `LOADING GET READY...`
+  </Step>
+  <Step title="First verse appears">
+    After 2 minutes, the mod fetches a verse from `bible-api.com` and displays it on both boards.
+  </Step>
+  <Step title="Automatic rotation">
+    Every 5 minutes from that point, a new verse is fetched and the boards are updated automatically.
+  </Step>
+</Steps>
+
+## Requirements
+
+Before installing, make sure you have the following:
+
+- **Gorilla Tag** — the PC version purchased on Steam. This mod does not work on standalone Quest.
+- **BepInEx** — the mod framework that loads BepInEx mods into Gorilla Tag. If you have not installed it yet, the [installation guide](/installation) covers this step.
+- **Network access** — the mod fetches verses from `bible-api.com`. Offline mode activates automatically if no connection is available, so network access is not strictly required.
+
+<Note>
+  Board Bibles V1 is a client-side mod. It only affects what you see on your screen and does not affect other players.
+</Note>
+
+## Next steps
+
+<CardGroup cols={2}>
+  <Card title="Installation" icon="download" href="/installation">
+    Install BepInEx and place the Board Bibles DLL in the correct directory.
+  </Card>
+  <Card title="Quickstart" icon="rocket" href="/quickstart">
+    Verify your setup and learn what to expect the first time you load in.
+  </Card>
+</CardGroup>

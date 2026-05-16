@@ -1,0 +1,156 @@
+---
+title: 'Board Bibles V1 troubleshooting guide and log tips'
+description: 'Diagnose and fix the most common problems with Board Bibles V1, from missing board text and offline mode to BepInEx load failures and blank boards.'
+---
+
+This page covers the most common issues users encounter with Board Bibles V1 and walks through how to diagnose and resolve each one. Most problems fall into one of three categories: the mod not loading at all, network issues triggering offline mode, or in-game board text not appearing as expected.
+
+<Note>
+  BepInEx writes a detailed log to `Gorilla Tag\BepInEx\LogOutput.log` every time the game runs. All Board Bibles V1 log messages are prefixed with `[Bible]`, making them easy to filter. Open this file first whenever something is not working — it is the fastest path to a diagnosis.
+</Note>
+
+<AccordionGroup>
+  <Accordion title="Boards still show the original MOTD or Code of Conduct" icon="triangle-alert">
+    If the boards display Gorilla Tag's default message-of-the-day or code of conduct text instead of Bible verses, the mod is not running. There are two likely causes:
+
+    **1. BepInEx is not installed correctly**
+
+    Board Bibles V1 is a BepInEx mod and cannot run without it. Verify that `Gorilla Tag\BepInEx\core\BepInEx.dll` exists and that BepInEx is configured as the game's preloader.
+
+    **2. The mod DLL is in the wrong directory**
+
+    The DLL must be placed at:
+    ```
+    Gorilla Tag\BepInEx\plugins\MO\
+    ```
+
+    The `MO\` subdirectory is required. Placing the file in `BepInEx\plugins\` directly may or may not work depending on your BepInEx version.
+
+    **How to confirm:**
+
+    Open `LogOutput.log` and search for `Astras.BoardBiblesV1` or `BibileV1`. A successful load looks like:
+
+    ```
+    [Info   :   BepInEx] Loading [BibileV1 0.0.2]
+    ```
+
+    If that line is absent, BepInEx did not find or load the mod. Double-check the install path and BepInEx setup.
+  </Accordion>
+
+  <Accordion title="Boards show verses with '(offline mode)' appended" icon="wifi-off">
+    The `(offline mode)` suffix means the mod could not reach `bible-api.com` and is displaying one of its 20 built-in fallback verses instead. This is expected behavior — the mod will not crash or go blank.
+
+    **Common causes:**
+
+    - No active internet connection at the time of the verse rotation
+    - A firewall, VPN, or network policy is blocking outbound HTTPS to `bible-api.com` on port 443
+    - The API itself is temporarily unavailable (rare)
+
+    **Steps to check:**
+
+    1. Open a browser and visit `https://bible-api.com/john%203:16`. If the page loads, your connection to the API is working.
+    2. If it does not load, check your firewall and VPN settings. Temporarily disabling a VPN is a quick way to rule it out.
+    3. Check `LogOutput.log` for the specific error that triggered offline mode:
+
+    | Log message | Meaning |
+    |-------------|---------|
+    | `[Bible] Your Network is shit, using hardcoded stuff.` | Connection failed or data processing error |
+    | `[Bible] HTTP error: {responseCode}` | API returned an error status code |
+    | `[Bible] Empty response` | API responded but sent no body |
+    | `[Bible] JSON error: {message}` | Response body could not be parsed |
+
+    <Tip>
+      If you are on a managed network (school, workplace, public Wi-Fi), the API endpoint may be blocked by a network policy. In that case, offline mode will activate every rotation cycle, and the 20 fallback verses will continue to display normally.
+    </Tip>
+  </Accordion>
+
+  <Accordion title="Boards show the welcome message for longer than expected" icon="clock">
+    At startup, both boards display:
+
+    ```
+    WELCOME TO BOARD BIBLE MADE BY ASTRA
+     LOADING GET READY...
+    ```
+
+    This message persists for **2 minutes** before the mod begins fetching and displaying verses. This timer starts from when the `Main` component initializes — which happens when BepInEx loads the mod — not from when you enter a lobby or when the game's loading screen finishes.
+
+    If you loaded into a lobby quickly but BepInEx took extra time to initialize, the timer may have started earlier than you expect, and the welcome message will clear sooner. Conversely, if the game took a long time to start, the timer was already running.
+
+    There is no way to skip or shorten the startup timer without recompiling the mod. Simply wait for the 2-minute window to expire.
+  </Accordion>
+
+  <Accordion title="No text appears on the boards at all" icon="square-dashed">
+    If the boards are completely blank — no heading, no verse text, and no welcome message — the mod may be loaded but unable to find the board GameObjects in the scene.
+
+    **How the mod finds the boards:**
+
+    Board Bibles V1 locates the boards by traversing a hardcoded GameObject path in the scene:
+
+    ```
+    Environment Objects/LocalObjects_Prefab/TreeRoom/
+    ```
+
+    If a Gorilla Tag update renames, moves, or restructures the scene hierarchy under this path, the mod's lookup will silently fail and the boards will not receive any text.
+
+    **How to check:**
+
+    1. Open `LogOutput.log` and look for any lines starting with `[Bible]` that reference errors or null objects.
+    2. If the mod loaded successfully (confirmed by finding `Loading [BibileV1 0.0.2]` in the log) but no text appears, the scene path is the most likely culprit.
+    3. Check whether a recent Gorilla Tag update changed the scene structure. If so, the mod needs to be updated to match the new path.
+
+    <Warning>
+      This is a known fragility of path-based GameObject lookup. If Gorilla Tag updates break the board path, there is no user-side workaround — a mod update is required.
+    </Warning>
+  </Accordion>
+
+  <Accordion title="How to find the BepInEx log file" icon="file-text">
+    BepInEx writes a full log of every mod load, error, and runtime message to a single file:
+
+    ```
+    Gorilla Tag\BepInEx\LogOutput.log
+    ```
+
+    This file is overwritten each time the game launches. If you need to preserve a log for reporting a bug, copy it to another location before restarting the game.
+
+    **Filtering for Board Bibles V1 messages:**
+
+    All log entries from this mod begin with `[Bible]`. To isolate them, open the file in any text editor and search for `[Bible]`. On Windows, Notepad++ or VS Code work well for this. On the command line:
+
+    ```powershell PowerShell
+    Select-String -Path "BepInEx\LogOutput.log" -Pattern "\[Bible\]"
+    ```
+
+    ```bash bash
+    grep "\[Bible\]" BepInEx/LogOutput.log
+    ```
+  </Accordion>
+
+  <Accordion title="How to verify the mod is loaded" icon="circle-check">
+    Even if the boards look unchanged, you can confirm the mod is present and was recognized by BepInEx by inspecting the log.
+
+    **Step 1:** Launch Gorilla Tag and wait for it to fully load.
+
+    **Step 2:** Close the game (or leave it running) and open:
+    ```
+    Gorilla Tag\BepInEx\LogOutput.log
+    ```
+
+    **Step 3:** Search for either of these strings:
+
+    - `Astras.BoardBiblesV1` — the plugin GUID
+    - `BibileV1` — the plugin display name
+
+    A successful load produces output similar to:
+
+    ```
+    [Info   :   BepInEx] Loading [BibileV1 0.0.2]
+    [Info   :   BepInEx] Loaded 1 plugins.
+    ```
+
+    If neither string appears, BepInEx did not load the mod. See the first accordion above for steps to fix the install.
+
+    <Info>
+      BepInEx lists all loaded plugins near the top of the log file, so you do not need to scroll far to find this confirmation.
+    </Info>
+  </Accordion>
+</AccordionGroup>

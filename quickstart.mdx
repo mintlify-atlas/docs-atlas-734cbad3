@@ -1,81 +1,102 @@
 ---
-title: "Quickstart"
-description: "Start building awesome documentation in minutes"
-icon: 'rocket'
+title: "Quickstart: see Bible verses on Gorilla Tag boards"
+description: "Go from a fresh install to seeing Bible verses on the TreeRoom boards. Covers first-launch behavior, the 2-minute splash, verse rotation, and offline fallback."
 ---
 
-## Get started in three steps
+This quickstart walks you through confirming your setup is correct and explains exactly what happens the first time you load into Gorilla Tag with Board Bibles V1 installed. If you have not installed the mod yet, start with the [installation guide](/installation).
 
-Get your documentation site running locally and make your first customization.
+## Before you begin
 
-### Step 1: Set up your local environment
+Make sure the following are true before launching the game:
 
-<AccordionGroup>
-  <Accordion icon="copy" title="Clone your docs locally">
-    During the onboarding process, you created a GitHub repository with your docs content if you didn't already have one. You can find a link to this repository in your [dashboard](https://dashboard.mintlify.com).
-    
-    To clone the repository locally so that you can make and preview changes to your docs, follow the [Cloning a repository](https://docs.github.com/en/repositories/creating-and-managing-repositories/cloning-a-repository) guide in the GitHub docs.
-  </Accordion>
-  <Accordion icon="rectangle-terminal" title="Start the preview server">
-    1. Install the Mintlify CLI: `npm i -g mint`
-    2. Navigate to your docs directory and run: `mint dev`
-    3. Open `http://localhost:3000` to see your docs live!
-    
-    <Tip>Your preview updates automatically as you edit files.</Tip>
-  </Accordion>
-</AccordionGroup>
+- BepInEx is installed in your Gorilla Tag directory (a `BepInEx` folder exists next to `Gorilla Tag.exe`)
+- `BoardBiblesV1.dll` is located at `Gorilla Tag\BepInEx\plugins\MO\BoardBiblesV1.dll`
+- You launched the game at least once after installing BepInEx so its configuration files were generated
 
-### Step 2: Deploy your changes
+<Note>
+  If you are unsure about any of these steps, the [installation guide](/installation) covers each one in detail.
+</Note>
 
-<AccordionGroup>
-  <Accordion icon="github" title="Install our GitHub app">
-    Install the Mintlify GitHub app from your [dashboard](https://dashboard.mintlify.com/settings/organization/github-app).
-    
-    Our GitHub app automatically deploys your changes to your docs site, so you don't need to manage deployments yourself.
-</Accordion>
-<Accordion icon="palette" title="Update your site name and colors">
-    For a first change, let's update the name and colors of your docs site.
+## Launch and verify
 
-    1. Open `docs.json` in your editor.
-    2. Change the `"name"` field to your project name.
-    3. Update the `"colors"` to match your brand.
-    4. Save and see your changes instantly at `http://localhost:3000`.
+<Steps>
+  <Step title="Start Gorilla Tag through Steam">
+    Launch the game normally from your Steam library. Do not launch `Gorilla Tag.exe` directly — always use Steam so BepInEx loads correctly.
+  </Step>
+  <Step title="Check the BepInEx console (optional)">
+    If you enabled the BepInEx console window in its config, you should see a line similar to the following during startup:
 
-    <Tip>Try changing the primary color to see an immediate difference!</Tip>
-  </Accordion>
-</AccordionGroup>
+    ```text
+    [Info   :   BepInEx] Loading [BibileV1 0.0.2]
+    ```
 
-### Step 3: Go live
+    This confirms BepInEx found and loaded the mod. If you do not see this line, verify the DLL is in the correct folder and check `BepInEx\LogOutput.log`.
+  </Step>
+  <Step title="Load into a room and go to the TreeRoom">
+    Join any room in Gorilla Tag and make your way to the **TreeRoom**. Both bulletin boards — the MOTD board and the Code of Conduct board — are on the walls near the tree.
+  </Step>
+</Steps>
 
-<Accordion icon="rocket" title="Publish your docs">
-  1. Commit and push your changes.
-  2. Your docs will update and be live in moments!
-</Accordion>
+## What to expect
+
+### The first 2 minutes: welcome splash
+
+When you first load in, both boards display a startup message:
+
+```text
+WELCOME TO BOARD BIBLE MADE BY ASTRA
+ LOADING GET READY...
+```
+
+This is intentional. The mod waits 2 minutes before making its first API call, giving the game time to fully settle after loading.
+
+### After 2 minutes: first verse
+
+Once the startup window has passed, the mod contacts `bible-api.com` and fetches a random verse from one of 8 books of the Bible. The verse and its reference appear on both boards simultaneously.
+
+<Tip>
+  Both the MOTD board and the Code of Conduct board always show the same verse at the same time. This is by design — the mod keeps both boards in sync.
+</Tip>
+
+### Every 5 minutes: automatic rotation
+
+The mod refreshes the verse every 5 minutes without any action from you. Each new verse is fetched live from the API, so the content changes throughout your session.
+
+## Offline mode
+
+If your network is unavailable or `bible-api.com` does not respond, the mod falls back to a set of 20 hardcoded verses. You can tell offline mode is active because the verse text will end with:
+
+```text
+(offline mode)
+```
+
+Offline fallback activates automatically — no configuration is needed.
+
+<Info>
+  Offline mode only activates when the API call fails. If you have a working internet connection but `bible-api.com` is temporarily unreachable, the mod will still display a verse from the offline pool rather than leaving the boards blank.
+</Info>
+
+## Troubleshooting at a glance
+
+<Tabs>
+  <Tab title="Boards still show default content">
+    The mod did not load. Check that `BoardBiblesV1.dll` is inside `Gorilla Tag\BepInEx\plugins\MO\` and not in a different folder. Then check `BepInEx\LogOutput.log` for errors.
+  </Tab>
+  <Tab title="Boards are blank">
+    The startup splash lasts 2 minutes. Wait for it to pass. If the boards remain blank after 2 minutes, the API call may have failed and the offline fallback may not have triggered — check your network connection and review the log file.
+  </Tab>
+  <Tab title="Verse shows (offline mode)">
+    Your network is unavailable or `bible-api.com` is unreachable. The mod is working correctly — it selected one of its 20 hardcoded fallback verses. Verses will continue to rotate every 5 minutes from the offline pool.
+  </Tab>
+</Tabs>
 
 ## Next steps
 
-Now that you have your docs running, explore these key features:
-
 <CardGroup cols={2}>
-
-<Card title="Write Content" icon="pen-to-square" href="/essentials/markdown">
-  Learn MDX syntax and start writing your documentation.
-</Card>
-
-<Card title="Customize style" icon="palette" href="/essentials/settings">
-  Make your docs match your brand perfectly.
-</Card>
-
-<Card title="Add code examples" icon="square-code" href="/essentials/code">
-  Include syntax-highlighted code blocks.
-</Card>
-
-<Card title="API documentation" icon="code" href="/api-reference/introduction">
-  Auto-generate API docs from OpenAPI specs.
-</Card>
-
+  <Card title="How verse display works" icon="book-open" href="/how-it-works/verse-display">
+    Learn how the mod patches the TreeRoom boards and controls what they show.
+  </Card>
+  <Card title="API and offline mode" icon="wifi" href="/how-it-works/api-and-offline">
+    See how the mod fetches verses and how offline fallback is implemented.
+  </Card>
 </CardGroup>
-
-<Note>
-  **Need help?** See our [full documentation](https://mintlify.com/docs) or join our [community](https://mintlify.com/community).
-</Note>

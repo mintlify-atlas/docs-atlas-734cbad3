@@ -1,0 +1,137 @@
+---
+title: 'How Board Bibles V1 takes over the TreeRoom boards'
+description: 'How Board Bibles V1 locates the TreeRoom bulletin board GameObjects, disables native text handlers, and drives the 2-minute splash and 5-minute rotation cycle.'
+---
+
+Board Bibles V1 takes over Gorilla Tag's built-in bulletin boards inside the TreeRoom scene to display scripture verses. This page explains how the mod finds the four relevant GameObjects, prevents the game from overwriting the mod's content, and drives the startup and rotation cycle through Unity's `Update()` loop.
+
+## Locating the GameObjects
+
+All four bulletin board text objects live under a fixed scene path:
+
+```
+Environment Objects/LocalObjects_Prefab/TreeRoom/
+```
+
+The `FindThem()` method calls `GameObject.Find()` with that base path prepended to each object name. It targets two heading slots and two body slots — one pair for the MOTD board and one pair for the Code of Conduct board:
+
+| Object name | Role |
+|---|---|
+| `motdHeadingText` | MOTD heading label |
+| `motdBodyText` | MOTD body content |
+| `CodeOfConductHeadingText` | CoC heading label |
+| `COCBodyText_TitleData` | CoC body content |
+
+```csharp
+string local = "Environment Objects/LocalObjects_Prefab/TreeRoom/";
+
+private void FindThem()
+{
+    GameObject MotdHTxt = GameObject.Find(local + "motdHeadingText");
+    GameObject MotdBTxt = GameObject.Find(local + "motdBodyText");
+    GameObject COCHTxt = GameObject.Find(local + "CodeOfConductHeadingText");
+    GameObject COCBTxt = GameObject.Find(local + "COCBodyText_TitleData");
+    MotdBTxt.GetComponent<PlayFabTitleDataTextDisplay>().enabled = false;
+    COCBTxt.GetComponent<PlayFabTitleDataTextDisplay>().enabled = false;
+    // ... assigns TMP_Text components
+}
+```
+
+<Note>
+`FindThem()` is called from `Update()` every frame until all four references are non-null. Once the objects are cached the method is no longer called.
+</Note>
+
+## Disabling the native text handler
+
+Gorilla Tag uses a `PlayFabTitleDataTextDisplay` component on the body text objects to pull live content from PlayFab's title data service. If left enabled, the game would overwrite whatever the mod writes to those `TMP_Text` fields on the next frame.
+
+Board Bibles V1 disables this component on both body objects immediately after finding them:
+
+```csharp
+MotdBTxt.GetComponent<PlayFabTitleDataTextDisplay>().enabled = false;
+COCBTxt.GetComponent<PlayFabTitleDataTextDisplay>().enabled = false;
+```
+
+<Warning>
+Only the two body objects carry `PlayFabTitleDataTextDisplay`. The heading objects do not, so no disable call is needed for those.
+</Warning>
+
+## Applying text every frame
+
+`ApplyTexts()` is called from `Update()` on every frame after the GameObjects are found. It writes the mod's heading and the current verse string to all four slots:
+
+```csharp
+private string ModHTitle = "Board Bible V1";
+
+private void ApplyTexts()
+{
+    if (MotdText != null)
+        MotdText.text = ModHTitle;
+    if (COCText != null)
+        COCText.text = ModHTitle;
+    if (MotdBodyText != null)
+        MotdBodyText.text = CV.ToUpper();
+    if (COCBodyText != null)
+        COCBodyText.text = CV.ToUpper();
+}
+```
+
+Both heading slots are set to the literal string `"Board Bible V1"`. Both body slots receive the current verse string stored in `CV`, converted to uppercase via `.ToUpper()` before display.
+
+<Tip>
+Writing text every frame is intentional. If another system tries to reset the billboard content, the mod's `Update()` call immediately restores it on the next frame.
+</Tip>
+
+## Startup and rotation cycle
+
+Board Bibles V1 follows a three-phase display loop from the moment the game loads:
+
+<Steps>
+  <Step title="Welcome message (0–2 minutes)">
+    On `Start()`, the current verse string `CV` is set to the welcome message and a start timestamp is recorded:
+
+    ```csharp
+    private string StartMsg = "WELCOME TO BOARD BIBLE MADE BY ASTRA\n LOADING GET READY...";
+
+    private void Start()
+    {
+        StartT = DateTime.UtcNow;
+        CV = StartMsg;
+    }
+    ```
+
+    The `showingStartMessage` flag stays `true` and `Update()` keeps writing the welcome message to the boards until two minutes have elapsed.
+  </Step>
+  <Step title="First verse fetch">
+    Once `DateTime.UtcNow - StartT >= TimeSpan.FromMinutes(2)`, `showingStartMessage` is set to `false` and `PickVerse()` is called for the first time. This triggers the `APIPuller` coroutine to request a verse from the live API (or fall back to the local list if the network is unavailable). See [API and offline fallback](/how-it-works/api-and-offline) for details.
+  </Step>
+  <Step title="5-minute rotation">
+    After the first verse loads, `Update()` checks whether five minutes have passed since `ChangeTime` was last set. If so, `PickVerse()` is called again:
+
+    ```csharp
+    if (!LV && (ChangeTime == null || DateTime.UtcNow - ChangeTime >= TimeSpan.FromMinutes(5)))
+    {
+        PickVerse();
+    }
+    ```
+
+    The `LV` (loading verse) flag prevents a second fetch from starting while one is already in progress.
+  </Step>
+</Steps>
+
+## Summary
+
+<CardGroup cols={2}>
+  <Card title="GameObject discovery" icon="search">
+    Four bulletin board objects are located by full scene path using `GameObject.Find()` and cached after the first successful lookup.
+  </Card>
+  <Card title="Native handler disabled" icon="ban">
+    `PlayFabTitleDataTextDisplay` is disabled on the two body objects so Gorilla Tag cannot overwrite the mod's content.
+  </Card>
+  <Card title="Frame-level text write" icon="repeat">
+    `ApplyTexts()` runs every frame, keeping both boards in sync with the current verse string at all times.
+  </Card>
+  <Card title="Timed rotation" icon="clock">
+    A 2-minute welcome screen is followed by verse fetches that rotate every 5 minutes for the duration of the session.
+  </Card>
+</CardGroup>

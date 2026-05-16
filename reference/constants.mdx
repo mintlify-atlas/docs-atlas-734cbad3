@@ -1,0 +1,151 @@
+---
+title: 'Board Bibles V1 constants, timing values, and data model'
+description: 'Complete reference for every plugin constant, timing value, API endpoint, response model, and hardcoded verse built into Board Bibles V1 v0.0.2.'
+---
+
+Board Bibles V1 defines all of its behavior through constants declared in `Constantss.cs` and hardcoded values in `Main.cs`. There is no external configuration file in this version — every value listed here is fixed at compile time. Understanding these constants helps you verify the mod is loaded correctly, debug unexpected behavior, and anticipate future changes.
+
+## Plugin identity constants
+
+These values are read by BepInEx at startup to register the mod. They appear in `BepInEx/LogOutput.log` and in any Harmony patch metadata.
+
+<ParamField path="Constantss.GUID" type="string" default="Astras.BoardBiblesV1">
+  The unique BepInEx plugin identifier. BepInEx uses this string to track the plugin in its internal registry and to namespace Harmony patches. If another mod targets this GUID for compatibility checks, this is the value to match.
+</ParamField>
+
+<ParamField path="Constantss.Name" type="string" default="BibileV1">
+  The display name shown in BepInEx's plugin list and log output. Note the intentional spelling — this matches the source exactly.
+</ParamField>
+
+<ParamField path="Constantss.Version" type="string" default="0.0.2">
+  The current semantic version of the mod. BepInEx logs this on startup alongside the GUID and name.
+</ParamField>
+
+<ParamField path="Constantss.ObjectName" type="string" default="GodIsGoodReadBible">
+  The name given to the persistent `GameObject` created in `Awake()`. This object is marked `DontDestroyOnLoad`, so it persists across scene transitions. You can find it in runtime scene inspection tools by searching for this name.
+</ParamField>
+
+<ParamField path="Constantss.INFORMATION" type="string" default="changes Both boards to the same things, Made By Astra">
+  A human-readable description of the mod's purpose. This is not displayed in-game; it serves as embedded metadata in the assembly.
+</ParamField>
+
+```csharp Constantss.cs
+namespace Astras_BB.Stuff;
+
+internal class Constantss
+{
+    public const string GUID        = "Astras.BoardBiblesV1";
+    public const string Name        = "BibileV1";
+    public const string Version     = "0.0.2";
+    public const string ObjectName  = "GodIsGoodReadBible";
+    public const string INFORMATION = "changes Both boards to the same things, Made By Astra";
+}
+```
+
+## Display constants
+
+These strings appear directly on the in-game boards.
+
+<ParamField path="Main.ModHTitle" type="string" default="Board Bible V1">
+  The heading text written to both boards. Both the local board and the remote board receive this same title string, which is the core behavior of the mod.
+</ParamField>
+
+<ParamField path="Main.StartMsg" type="string" default="WELCOME TO BOARD BIBLE MADE BY ASTRA\n LOADING GET READY...">
+  The message displayed on the boards during the 2-minute startup window after the mod loads. The `\n` produces a line break between the two lines.
+</ParamField>
+
+## Timing values
+
+<Note>
+  All timing is measured from the moment the mod's `Main` component initializes, not from when the Gorilla Tag lobby fully loads. The two events may be separated by several seconds.
+</Note>
+
+<ParamField path="startup duration" type="TimeSpan" default="2 minutes">
+  How long `StartMsg` is shown before the mod begins fetching and rotating Bible verses. Implemented as `TimeSpan.FromMinutes(2)`.
+</ParamField>
+
+<ParamField path="verse rotation interval" type="TimeSpan" default="5 minutes">
+  How frequently the mod replaces the current verse with a newly fetched one. Implemented as `TimeSpan.FromMinutes(5)`.
+</ParamField>
+
+<ParamField path="API timeout" type="number" default="8">
+  The number of seconds the mod waits for a response from `bible-api.com` before giving up and falling back to an offline verse. Set via `GIF.timeout = 8`.
+</ParamField>
+
+## API endpoint
+
+<ParamField path="API URL" type="string" default="https://bible-api.com/{reference}">
+  The endpoint used to fetch verse text. The `{reference}` segment is URL-escaped and built from a randomly selected book, chapter, and verse. Example: `https://bible-api.com/john%203%3A16`.
+</ParamField>
+
+### Book, chapter, and verse ranges
+
+The mod selects verses at random within these bounds on each rotation cycle.
+
+| Parameter | Value | Notes |
+|-----------|-------|-------|
+| Books | john, psalms, romans, proverbs, matthew, isaiah, james, hebrews | 8 books total |
+| Chapter range | 1–19 | `Random.Range(1, 20)` — upper bound exclusive |
+| Verse range | 1–29 | `Random.Range(1, 30)` — upper bound exclusive |
+
+<Warning>
+  Not every combination of book + chapter + verse is valid. If the API returns an empty body or an HTTP error for an invalid reference, the mod falls back to its offline verse list and logs the failure to `LogOutput.log`.
+</Warning>
+
+## Install path
+
+<ParamField path="output path" type="string" default="Gorilla Tag\BepInEx\plugins\MO\">
+  The directory where the mod DLL must be placed for BepInEx to load it. The `MO\` subdirectory is non-standard — most mods sit directly in `plugins\` — so take care when installing manually.
+</ParamField>
+
+## `ApiBibleRes` response model
+
+When a successful API response is received, the JSON body is deserialized into this model:
+
+```csharp ApiBibleRes.cs
+[Serializable]
+public class ApiBibleRes
+{
+    public string? reference;
+    public string? text;
+}
+```
+
+<ResponseField name="reference" type="string">
+  The canonical reference string returned by the API (for example, `"John 3:16"`). May be `null` if the API returns a malformed response.
+</ResponseField>
+
+<ResponseField name="text" type="string">
+  The full verse text. May be `null` or empty, in which case the mod logs `[Bible] Empty response` and displays a fallback verse instead.
+</ResponseField>
+
+## Offline verse list
+
+When the network is unavailable or the API call fails, the mod displays one of the following 20 hardcoded verses, appended with `(offline mode)`:
+
+<CardGroup cols={2}>
+  <Card title="New Testament" icon="book-open">
+    - John 3:16
+    - Philippians 4:13
+    - Romans 8:28
+    - Matthew 5:14
+    - Matthew 11:28
+    - Romans 12:2
+    - 2 Timothy 1:7
+    - Colossians 3:23
+    - Hebrews 11:1
+    - Galatians 5:22
+    - James 1:2
+    - 1 Peter 5:7
+  </Card>
+  <Card title="Old Testament" icon="book">
+    - Psalm 23:1
+    - Proverbs 3:5
+    - Jeremiah 29:11
+    - Isaiah 41:10
+    - Joshua 1:9
+    - Psalm 46:1
+    - Isaiah 40:31
+    - Psalm 118:24
+  </Card>
+</CardGroup>

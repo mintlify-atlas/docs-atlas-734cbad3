@@ -1,0 +1,127 @@
+---
+title: "Install Board Bibles V1: BepInEx setup for Gorilla Tag"
+description: "Step-by-step instructions for installing BepInEx and placing the Board Bibles V1 DLL into the correct plugins folder in your Gorilla Tag directory on PC."
+---
+
+Installing Board Bibles V1 takes two stages: setting up BepInEx as the mod framework, then dropping the Board Bibles DLL into the correct plugins folder. The entire process takes a few minutes on a PC with Gorilla Tag already installed through Steam.
+
+## Prerequisites
+
+- **Gorilla Tag (PC/Steam)** — the mod targets the PC version of the game. It does not run on the standalone Meta Quest version.
+- **Windows** — BepInEx for Gorilla Tag is a Windows-only framework.
+- **Network access (optional)** — the mod fetches verses from `bible-api.com` at runtime. If you are offline, it falls back to 20 hardcoded verses automatically.
+
+<Warning>
+  This is a client-side mod. Do not install it on a dedicated server or attempt to use it on the Quest standalone build — it will not function and may cause errors.
+</Warning>
+
+## Step 1: Find your Gorilla Tag installation directory
+
+You need to know where Steam installed Gorilla Tag before placing any files.
+
+<Steps>
+  <Step title="Open Steam and locate the game">
+    In your Steam library, right-click **Gorilla Tag** and select **Manage → Browse local files**. This opens the game's root directory in File Explorer.
+  </Step>
+  <Step title="Note the path">
+    The path typically looks like:
+    ```text
+    C:\Program Files (x86)\Steam\steamapps\common\Gorilla Tag
+    ```
+    Keep this window open — you will need it in later steps.
+  </Step>
+</Steps>
+
+## Step 2: Install BepInEx
+
+BepInEx is the plugin framework that loads mods into Gorilla Tag. If you already have BepInEx installed (you can tell by the presence of a `BepInEx` folder inside your Gorilla Tag directory), skip to [Step 3](#step-3-create-the-plugins-subfolder).
+
+<Steps>
+  <Step title="Download BepInEx for Gorilla Tag">
+    Get the BepInEx build recommended for Gorilla Tag from [Thunderstore](https://thunderstore.io/c/gorilla-tag/p/BepInEx/BepInExPack_Gorilla_Tag/) or the [BepInEx GitHub releases](https://github.com/BepInEx/BepInEx/releases). Use the **x64** variant if prompted.
+  </Step>
+  <Step title="Extract the archive">
+    Extract the downloaded ZIP file. You will see a folder structure that includes a `BepInEx` folder and a `winhttp.dll` file (or similar).
+  </Step>
+  <Step title="Copy files into the Gorilla Tag directory">
+    Copy the contents of the extracted archive directly into the root of your Gorilla Tag installation directory — the same folder that contains `Gorilla Tag.exe`. Do not create a subfolder.
+
+    After copying, your Gorilla Tag directory should contain:
+    ```text
+    Gorilla Tag/
+    ├── BepInEx/
+    │   ├── plugins/
+    │   ├── config/
+    │   └── ...
+    ├── Gorilla Tag.exe
+    └── winhttp.dll
+    ```
+  </Step>
+  <Step title="Run the game once to initialize BepInEx">
+    Launch Gorilla Tag from Steam. Let it reach the main menu, then close it. This first run generates the BepInEx configuration files and the full `plugins` directory structure.
+  </Step>
+</Steps>
+
+## Step 3: Create the plugins subfolder
+
+Board Bibles V1 is configured to output to a specific subdirectory inside `plugins`. You need to create this folder if it does not already exist.
+
+<Steps>
+  <Step title="Navigate to the plugins directory">
+    Inside your Gorilla Tag installation, go to:
+    ```text
+    Gorilla Tag\BepInEx\plugins\
+    ```
+  </Step>
+  <Step title="Create the MO subfolder">
+    Create a new folder named `MO` inside `plugins`:
+    ```text
+    Gorilla Tag\BepInEx\plugins\MO\
+    ```
+  </Step>
+</Steps>
+
+## Step 4: Install the Board Bibles V1 DLL
+
+<Steps>
+  <Step title="Download the Board Bibles V1 DLL">
+    Download the latest `BoardBiblesV1.dll` from the [Board Bibles V1 GitHub releases](https://github.com/ASTRA228b/BoardBiblesV1/releases). The current version is `0.0.2`.
+  </Step>
+  <Step title="Place the DLL in the correct directory">
+    Move or copy `BoardBiblesV1.dll` into the `MO` folder you created:
+    ```text
+    Gorilla Tag\BepInEx\plugins\MO\BoardBiblesV1.dll
+    ```
+
+    <Warning>
+      The DLL must be inside `plugins\MO\`, not directly inside `plugins\`. Placing it in the wrong folder will prevent BepInEx from loading it correctly.
+    </Warning>
+  </Step>
+</Steps>
+
+## Step 5: Launch Gorilla Tag
+
+Start Gorilla Tag through Steam. BepInEx will detect and load `BoardBiblesV1.dll` automatically at startup.
+
+<Note>
+  The mod fetches verses from `bible-api.com` during gameplay. If your firewall or network blocks outbound requests to that domain, the mod will fall back to offline mode and display one of its 20 hardcoded verses instead.
+</Note>
+
+## Verifying the installation
+
+Once in-game, head to the **TreeRoom**. Within the first 2 minutes you should see the welcome splash message on both bulletin boards. After that, a Bible verse will appear. If the boards still show the default MOTD or Code of Conduct content, see the troubleshooting reference.
+
+<Tip>
+  BepInEx writes a log file to `Gorilla Tag\BepInEx\LogOutput.log`. If the mod does not appear to load, open that file and search for `Astras.BoardBiblesV1` to confirm whether BepInEx detected the plugin.
+</Tip>
+
+## Next steps
+
+<CardGroup cols={2}>
+  <Card title="Quickstart" icon="rocket" href="/quickstart">
+    Learn what to expect the first time you load in and how verse rotation works.
+  </Card>
+  <Card title="How it works" icon="gears" href="/how-it-works/verse-display">
+    Understand how the mod patches the boards and fetches verses.
+  </Card>
+</CardGroup>

@@ -1,0 +1,208 @@
+---
+title: 'API Fetching and Offline Fallback for Bible Verses'
+description: 'How Board Bibles V1 queries bible-api.com for random scripture, handles every failure mode, and falls back to 20 hardcoded verses when offline.'
+---
+
+Board Bibles V1 retrieves scripture dynamically from the public `bible-api.com` REST API at runtime. When the network is unavailable or the API returns an unexpected response, the mod falls back to a curated list of 20 hardcoded verses without interrupting gameplay. This page documents the fetch logic, the response model, every failure path, and the complete offline verse list.
+
+## How the API request is built
+
+`PickVerse()` starts the `APIPuller` coroutine. The coroutine selects a book, chapter, and verse at random, then constructs a URL from those values:
+
+```csharp
+private IEnumerator APIPuller()
+{
+    LV = true;
+    string[] books = { "john", "psalms", "romans", "proverbs", "matthew", "isaiah", "james", "hebrews" };
+    string book = books[UnityEngine.Random.Range(0, books.Length)];
+    int chapter = UnityEngine.Random.Range(1, 20);
+    int verse = UnityEngine.Random.Range(1, 30);
+    string refText = $"{book} {chapter}:{verse}";
+    string url = "https://bible-api.com/" + UnityWebRequest.EscapeURL(refText);
+    // ...
+}
+```
+
+The random ranges produce:
+
+| Parameter | Pool |
+|---|---|
+| Book | One of 8 books (index 0–7) |
+| Chapter | 1–19 (inclusive) |
+| Verse | 1–29 (inclusive) |
+
+`UnityWebRequest.EscapeURL` percent-encodes the reference string so spaces and colons are safely transmitted — for example, `john 3:16` becomes `john%203%3A16` in the final URL.
+
+<Info>
+Not every book/chapter/verse combination exists in the Bible. When the API receives a reference that does not resolve to a real verse, it returns an HTTP error, which triggers the offline fallback automatically.
+</Info>
+
+## Request settings and response model
+
+The request is issued with an 8-second timeout:
+
+```csharp
+using (UnityWebRequest GIF = UnityWebRequest.Get(url))
+{
+    GIF.timeout = 8;
+    yield return GIF.SendWebRequest();
+    // ...
+}
+```
+
+A successful response is a JSON object. The mod deserialises it into `ApiBibleRes` using `JsonUtility.FromJson`:
+
+```csharp
+[Serializable]
+public class ApiBibleRes
+{
+    public string? reference;
+    public string? text;
+}
+```
+
+```csharp
+Data = JsonUtility.FromJson<ApiBibleRes>(GIF.downloadHandler.text);
+CV = Data.reference + " - " + Data.text;
+ChangeTime = DateTime.UtcNow;
+LV = false;
+```
+
+The displayed string joins the `reference` and `text` fields with ` - `, and `ApplyTexts()` then uppercases the whole string before writing it to the bulletin board. For example:
+
+```
+JOHN 3:16 - FOR GOD SO LOVED THE WORLD THAT HE GAVE HIS ONE AND ONLY SON.
+```
+
+## Failure handling
+
+The coroutine checks for every failure mode before attempting to deserialise the response. Each failure path calls `UseLocal()` and exits the coroutine with `yield break`:
+
+<AccordionGroup>
+  <Accordion title="ConnectionError / DataProcessingError">
+    Triggered when the device cannot reach the server — no network, DNS failure, or a transport-layer problem. The mod logs a warning and switches to offline mode immediately.
+
+    ```csharp
+    if (GIF.result == UnityWebRequest.Result.ConnectionError ||
+        GIF.result == UnityWebRequest.Result.DataProcessingError)
+    {
+        Debug.LogWarning("[Bible] Your Network is shit, using hardcoded stuff.");
+        UseLocal();
+        yield break;
+    }
+    ```
+  </Accordion>
+  <Accordion title="ProtocolError (HTTP error)">
+    Triggered when the server returns a 4xx or 5xx status code — for example, a 404 when the requested verse reference does not exist in the API database.
+
+    ```csharp
+    if (GIF.result == UnityWebRequest.Result.ProtocolError)
+    {
+        Debug.LogWarning("[Bible] HTTP error: " + GIF.responseCode);
+        UseLocal();
+        yield break;
+    }
+    ```
+  </Accordion>
+  <Accordion title="Empty response body">
+    If the download handler returns a null or empty string despite a 200 status, the mod treats that as a failure.
+
+    ```csharp
+    if (string.IsNullOrEmpty(GIF.downloadHandler.text))
+    {
+        Debug.LogWarning("[Bible] Empty response");
+        UseLocal();
+        yield break;
+    }
+    ```
+  </Accordion>
+  <Accordion title="JSON parse failure">
+    If `JsonUtility.FromJson` throws an exception, or if the deserialised object is null or has an empty `text` field, the mod falls back to offline mode.
+
+    ```csharp
+    try
+    {
+        Data = JsonUtility.FromJson<ApiBibleRes>(GIF.downloadHandler.text);
+    }
+    catch (Exception e)
+    {
+        Debug.LogWarning("[Bible] JSON error: " + e.Message);
+        UseLocal();
+        yield break;
+    }
+
+    if (Data == null || string.IsNullOrEmpty(Data.text))
+    {
+        UseLocal();
+        yield break;
+    }
+    ```
+  </Accordion>
+</AccordionGroup>
+
+## Offline fallback
+
+`UseLocal()` picks a verse at random from the hardcoded `verses` array, appends `\n\n(offline mode)` so players know the live API was not reached, then resets the rotation timer and clears the loading flag:
+
+```csharp
+private void UseLocal()
+{
+    int index = UnityEngine.Random.Range(0, verses.Length);
+    CV = verses[index];
+    CV += "\n\n(offline mode)";
+    ChangeTime = DateTime.UtcNow;
+    LV = false;
+}
+```
+
+The complete set of 20 hardcoded verses is:
+
+```csharp
+private readonly string[] verses =
+{
+ "John 3:16 - For God so loved the world that he gave his one and only Son.",
+ "Philippians 4:13 - I can do all things through Christ who strengthens me.",
+ "Psalm 23:1 - The Lord is my shepherd; I shall not want.",
+ "Romans 8:28 - And we know that in all things God works for good.",
+ "Proverbs 3:5 - Trust in the Lord with all your heart.",
+ "Jeremiah 29:11 - Plans to give you hope and a future.",
+ "Matthew 5:14 - You are the light of the world.",
+ "Isaiah 41:10 - Do not fear, for I am with you.",
+ "Joshua 1:9 - Be strong and courageous.",
+ "1 Peter 5:7 - Cast all your anxiety on him because he cares for you.",
+ "Romans 12:2 - Be transformed by the renewing of your mind.",
+ "Psalm 46:1 - God is our refuge and strength.",
+ "Matthew 11:28 - Come to me, all who are weary.",
+ "2 Timothy 1:7 - God gave us power, love, and self-control.",
+ "Colossians 3:23 - Work at it with all your heart.",
+ "Isaiah 40:31 - Those who hope in the Lord will renew their strength.",
+ "Hebrews 11:1 - Faith is confidence in what we hope for.",
+ "Psalm 118:24 - This is the day the Lord has made.",
+ "Galatians 5:22 - The fruit of the Spirit is love, joy, peace.",
+ "James 1:2 - Consider it joy when you face trials."
+};
+```
+
+<Note>
+The offline list includes verses from books outside the 8 sampled by the API (Philippians, Jeremiah, Joshua, 1 Peter, 2 Timothy, Colossians, Galatians). This gives a broader range of scripture in offline mode.
+</Note>
+
+## Full fetch flow summary
+
+<Steps>
+  <Step title="Set loading flag">
+    `LV` is set to `true` at the start of `APIPuller` to prevent concurrent fetch attempts.
+  </Step>
+  <Step title="Build random reference">
+    A book, chapter, and verse are chosen at random. The reference string is URL-encoded and appended to the `bible-api.com` base URL.
+  </Step>
+  <Step title="Send request (8-second timeout)">
+    `UnityWebRequest.Get` sends the request. The coroutine yields until the response arrives or the timeout expires.
+  </Step>
+  <Step title="Check for errors">
+    Connection errors, HTTP errors, empty bodies, and JSON parse failures each call `UseLocal()` and exit.
+  </Step>
+  <Step title="Deserialise and display">
+    On success, `reference` and `text` are joined with ` - `, stored in `CV`, and the rotation timer is reset. `LV` is cleared to `false`.
+  </Step>
+</Steps>

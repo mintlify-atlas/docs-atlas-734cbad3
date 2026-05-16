@@ -1,0 +1,39 @@
+{
+  "projectType": "general",
+  "projectName": "Board Bibles V1",
+  "projectDescription": "A BepInEx mod for Gorilla Tag that replaces in-game bulletin boards with rotating Bible verses fetched from a live API, with offline fallback support.",
+  "theme": "almond",
+  "primaryColor": "#8B6914",
+  "lightColor": "#F5DEB3",
+  "darkColor": "#4A3608",
+  "navigation": {
+    "groups": [
+      {
+        "group": "Get Started",
+        "pages": ["introduction", "installation", "quickstart"]
+      },
+      {
+        "group": "How It Works",
+        "pages": ["how-it-works/verse-display", "how-it-works/api-and-offline", "how-it-works/patching"]
+      },
+      {
+        "group": "Reference",
+        "pages": ["reference/constants", "reference/configuration", "reference/troubleshooting"]
+      }
+    ]
+  },
+  "keyFeatures": [
+    "Replaces Gorilla Tag's in-game bulletin boards (MOTD and Code of Conduct) with Bible verses",
+    "Fetches random verses from bible-api.com across 8 books of the Bible",
+    "Offline mode with 20 hardcoded fallback verses when network is unavailable",
+    "Welcome splash message on startup, then rotates verses every 5 minutes",
+    "Built on BepInEx and Harmony for seamless mod patching with no game modification required"
+  ],
+  "publicApiSurface": [
+    "Plugin (BepInEx BaseUnityPlugin entry point)",
+    "Main.ApiBibleRes (API response model: reference, text)",
+    "PatchLoader.Apply() (applies Harmony patches)",
+    "Constantss.GUID = \"Astras.BoardBiblesV1\"",
+    "Constantss.Version = \"0.0.2\""
+  ]
+}

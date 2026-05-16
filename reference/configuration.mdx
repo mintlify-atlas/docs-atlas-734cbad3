@@ -1,0 +1,94 @@
+---
+title: 'Board Bibles V1 configuration and install location'
+description: 'Board Bibles V1 v0.0.2 has no external config file. All behavior is fixed at compile time. Learn what each value does and how offline mode activates.'
+---
+
+Board Bibles V1 version 0.0.2 ships without a user-facing configuration file. Every behavioral parameter — rotation interval, startup duration, API timeout, and the set of books sampled — is compiled directly into the mod. This page describes what each fixed behavior does, how to install the mod correctly, and what happens when the mod cannot reach the internet.
+
+<Note>
+  Config file support may be added in a future version of Board Bibles. When that happens, this page will be updated to document each available option. For now, the only way to change mod behavior is to recompile from source with modified constants.
+</Note>
+
+## Fixed behaviors
+
+None of the values below can be changed without modifying and recompiling the source code. They are listed here so you know exactly what to expect at runtime.
+
+| Behavior | Fixed value | Description |
+|----------|-------------|-------------|
+| Startup display duration | 2 minutes | The welcome message is shown for this long after the mod loads before verse rotation begins. |
+| Verse rotation interval | 5 minutes | A new verse is fetched from the API (or chosen from the offline list) every 5 minutes. |
+| API request timeout | 8 seconds | If `bible-api.com` does not respond within 8 seconds, the request is abandoned and an offline verse is used. |
+| Books sampled | john, psalms, romans, proverbs, matthew, isaiah, james, hebrews | Only these 8 books are included in random verse selection. |
+| Chapter range | 1–19 | Chapters are selected randomly within this range for each API request. |
+| Verse range | 1–29 | Verses are selected randomly within this range for each API request. |
+| Board heading | `Board Bible V1` | Both boards always display this heading. |
+
+## Install directory
+
+The mod DLL must be placed in a specific subdirectory for BepInEx to discover and load it.
+
+**Required path:**
+```
+Gorilla Tag\BepInEx\plugins\MO\
+```
+
+<Warning>
+  The `MO\` subdirectory is non-standard. Most BepInEx mods are placed directly in `BepInEx\plugins\`. The intended and configured output path for this mod is `plugins\MO\` — use this exact path.
+</Warning>
+
+### Verifying the install path
+
+After placing the DLL, open `Gorilla Tag\BepInEx\LogOutput.log` after launching the game and search for `Astras.BoardBiblesV1`. A successful load produces a log entry similar to:
+
+```
+[Info   :   BepInEx] Loading [BibileV1 0.0.2]
+```
+
+If you do not see this line, the DLL is either in the wrong directory or BepInEx itself is not installed correctly.
+
+## Network access
+
+Board Bibles V1 makes outbound HTTPS requests to `bible-api.com` to retrieve verse text. The mod does not cache responses to disk — each rotation cycle fetches a fresh verse.
+
+**Required network access:**
+
+| Destination | Protocol | Port |
+|-------------|----------|------|
+| `bible-api.com` | HTTPS | 443 |
+
+<Info>
+  No authentication or API key is required. `bible-api.com` is a free, open API.
+</Info>
+
+### Firewalls and VPNs
+
+Network security software or VPN configurations that block outbound HTTPS to `bible-api.com` will prevent the mod from fetching verses. The mod detects connection failures and automatically activates offline mode — no crash or error dialog is shown in-game.
+
+If you are on a managed network (school, workplace, public Wi-Fi) and the boards consistently show `(offline mode)`, the API endpoint is likely being blocked by a network policy.
+
+## Offline mode
+
+When any of the following conditions occur, the mod falls back to its built-in list of 20 hardcoded verses:
+
+- The device has no active internet connection (`ConnectionError`)
+- An unexpected error occurs while processing the response (`DataProcessingError`)
+- The API returns an HTTP error status (`ProtocolError`)
+- The API returns an empty response body
+- The API response cannot be parsed as valid JSON
+
+In offline mode, a verse from the hardcoded list is selected and displayed with `(offline mode)` appended to the text. The boards continue to rotate through offline verses on the same 5-minute interval.
+
+<Tip>
+  Offline mode is intentional, not a bug. If you prefer the API verses, check that `bible-api.com` is reachable from your network before reporting an issue.
+</Tip>
+
+### BepInEx log messages in offline mode
+
+The following lines in `LogOutput.log` indicate why offline mode activated for a given rotation cycle:
+
+| Log message | Cause |
+|-------------|-------|
+| `[Bible] Your Network is shit, using hardcoded stuff.` | `ConnectionError` or `DataProcessingError` |
+| `[Bible] HTTP error: {responseCode}` | API returned a non-success HTTP status |
+| `[Bible] Empty response` | API returned an empty body |
+| `[Bible] JSON error: {exception.Message}` | Response body could not be deserialized |

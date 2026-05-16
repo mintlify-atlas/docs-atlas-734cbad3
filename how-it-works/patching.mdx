@@ -1,0 +1,137 @@
+---
+title: 'Plugin Bootstrap and Harmony Patching in Board Bibles V1'
+description: 'How BepInEx loads Board Bibles V1, how the persistent Main MonoBehaviour is created at startup, and the role Harmony plays in the current mod architecture.'
+---
+
+Board Bibles V1 is loaded by BepInEx as a standard Unity plugin. The `Plugin` class handles the two-phase Unity startup — `Awake` and `Start` — to create a persistent game object that carries the mod's core logic across every scene load. This page covers the BepInEx plugin declaration, the object lifecycle, and how Harmony fits into the current architecture.
+
+## BepInEx plugin declaration
+
+BepInEx identifies plugins by a `[BepInPlugin]` attribute on the class that inherits `BaseUnityPlugin`. For Board Bibles V1 the attribute is:
+
+```csharp
+[BepInPlugin(Constantss.GUID, Constantss.Name, Constantss.Version)]
+public class Plugin : BaseUnityPlugin
+{
+    void Start() { PatchLoader.Apply(); }
+    void Awake()
+    {
+        GameObject Plugin = new GameObject(Constantss.ObjectName);
+        Plugin.AddComponent<Main>();
+        DontDestroyOnLoad(Plugin);
+    }
+}
+```
+
+The three identifiers resolve to:
+
+| Constant | Value |
+|---|---|
+| `Constantss.GUID` | `Astras.BoardBiblesV1` |
+| `Constantss.Name` | `BibileV1` |
+| `Constantss.Version` | `0.0.2` |
+
+BepInEx uses the GUID to uniquely identify the mod in its plugin registry and in Harmony's patch tracking.
+
+## Awake: creating the persistent game object
+
+`Awake` runs before the first frame is rendered. The `Plugin` class uses it to create the object that hosts the `Main` MonoBehaviour:
+
+```csharp
+void Awake()
+{
+    GameObject Plugin = new GameObject(Constantss.ObjectName);
+    Plugin.AddComponent<Main>();
+    DontDestroyOnLoad(Plugin);
+}
+```
+
+<Steps>
+  <Step title="Create the GameObject">
+    `new GameObject(Constantss.ObjectName)` creates a plain game object named `GodIsGoodReadBible` in the current scene. It has no renderer or collider — it exists purely to host the script component.
+  </Step>
+  <Step title="Attach the Main MonoBehaviour">
+    `AddComponent<Main>()` attaches the core script. Unity immediately begins calling `Main`'s lifecycle methods (`Start`, `Update`, etc.) for that object.
+  </Step>
+  <Step title="Persist across scene loads">
+    `DontDestroyOnLoad(Plugin)` moves the game object to a special internal scene that Unity does not unload when the player travels between areas. This ensures the verse display and rotation timer continue running regardless of which Gorilla Tag scene is active.
+  </Step>
+</Steps>
+
+<Note>
+Without `DontDestroyOnLoad`, Unity would destroy the `Main` game object whenever a scene transition occurred, resetting the timer and losing the cached board references.
+</Note>
+
+## Start: applying Harmony patches
+
+`Start` runs after `Awake`, once all objects in the scene have been initialised. The `Plugin` class uses it to call `PatchLoader.Apply()`:
+
+```csharp
+void Start() { PatchLoader.Apply(); }
+```
+
+`PatchLoader` creates a `Harmony` instance keyed to the mod's GUID and calls `PatchAll()` on the executing assembly:
+
+```csharp
+using HarmonyLib;
+namespace Astras_BB.Stuff;
+
+public class PatchLoader
+{
+    public static void Apply()
+    {
+        Harmony VALLL = new Harmony(Constantss.GUID);
+        VALLL.PatchAll();
+    }
+}
+```
+
+`PatchAll()` scans every type in the assembly for classes decorated with `[HarmonyPatch]` attributes and applies the corresponding prefix, postfix, or transpiler patches automatically.
+
+<Info>
+Board Bibles V1 does not define any `[HarmonyPatch]` classes in this release. The mod achieves its effect by locating GameObjects directly via `GameObject.Find()` and disabling the `PlayFabTitleDataTextDisplay` component, rather than patching game methods. `PatchAll()` completes without registering any patches, but the infrastructure is in place for future versions to add method patches if needed.
+</Info>
+
+## The MonoBehaviour update loop
+
+Once the `Main` game object exists, Unity drives everything through standard MonoBehaviour callbacks:
+
+<CardGroup cols={2}>
+  <Card title="Start()" icon="play">
+    Sets the welcome message string and records the startup timestamp. Called once when the component is first enabled.
+  </Card>
+  <Card title="Update()" icon="repeat">
+    Called every frame. Checks whether the board GameObjects have been found yet, manages the welcome/verse/rotation state machine, and calls `ApplyTexts()` to write current content to the boards.
+  </Card>
+  <Card title="FindThem()" icon="search">
+    Invoked from `Update()` until all four `TMP_Text` references are non-null. Once cached they remain valid for the lifetime of the game object.
+  </Card>
+  <Card title="PickVerse() / APIPuller" icon="globe">
+    `PickVerse()` starts the `APIPuller` coroutine, which runs asynchronously alongside the main game loop without blocking the frame rate.
+  </Card>
+</CardGroup>
+
+## Lifecycle summary
+
+```
+BepInEx loads Plugin
+        │
+        ├── Awake()
+        │     ├── new GameObject("GodIsGoodReadBible")
+        │     ├── AddComponent<Main>()
+        │     └── DontDestroyOnLoad(...)
+        │
+        └── Start()
+              └── PatchLoader.Apply()
+                    ├── new Harmony("Astras.BoardBiblesV1")
+                    └── PatchAll()  ← no patches registered in v0.0.2
+
+Main.Start()     → records StartT, sets welcome message
+Main.Update()    → frame loop: find objects → manage timers → apply text
+APIPuller        → coroutine: fetch verse → parse → update CV
+UseLocal()       → offline fallback: pick from hardcoded array → update CV
+```
+
+<Tip>
+To add a Harmony patch in a future version, create a static class with a `[HarmonyPatch(typeof(TargetClass), nameof(TargetClass.TargetMethod))]` attribute. `PatchLoader.Apply()` will pick it up automatically on the next load without any other changes.
+</Tip>
